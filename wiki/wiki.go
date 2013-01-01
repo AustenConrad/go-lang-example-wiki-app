@@ -1,5 +1,5 @@
 // Roughly based on the Go lang tutorial for web services at: http://golang.org/doc/articles/wiki/
-package main
+package examplewiki
 
 import (
 	/* Switched to a closure to load and validate the page's title instead. See 'makeHandler'
@@ -12,7 +12,8 @@ import (
 	"regexp"
 )
 
-func main() {
+// Main wiki controller.
+func wiki() {
 
 	/* Switched to a closure to load and validate the page's title instead. See 'makeHandler'
 	http.HandleFunc("/view/", viewHandler)
@@ -24,7 +25,9 @@ func main() {
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
 
+	/* Turn this off when App is being started by the Google App Engine as it's not needed.
 	http.ListenAndServe(":8080", nil)
+	*/
 }
 
 // Define the data structure of a page.
@@ -36,13 +39,13 @@ type Page struct {
 
 // Saves the page from memory to disk. Filename is the title of the page.
 func (p *Page) save() error {
-	filename := "data/" + p.Title + ".txt"
+	filename := "wiki/data/" + p.Title + ".txt"
 	return ioutil.WriteFile(filename, p.Body, 0600)
 }
 
 // Loads the page from disk into memory. Uses the page's title to reference the page's file name.
 func loadPage(title string) (*Page, error) {
-	filename := "data/" + title + ".txt"
+	filename := "wiki/data/" + title + ".txt"
 	body, err := ioutil.ReadFile(filename)
 
 	// Check for any errors that occured while opening the specified file.
@@ -58,8 +61,8 @@ func loadPage(title string) (*Page, error) {
 // Set the paths that the handlers are working at.
 const lenPath = len("/view/")
 
-// Set which templates we should cache so that we don't have to 'ParseFiles' them from disk on every page request.
-var cached_templates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
+// Cache all of the HTML files in the templates directory so that we only have to hit disk once.
+var cached_templates = template.Must(template.ParseGlob("wiki/templates/*.html"))
 
 // Set the valid title rules so that user's cannot request just any file they like from the server. #Security
 var titleValidator = regexp.MustCompile("^[a-zA-Z0-9]+$")
@@ -205,7 +208,7 @@ func renderTemplate(res http.ResponseWriter, template_name string, p *Page) {
 	/* Commented out because we switched to a template caching method.
 
 	// Use Go's html/template engine.
-	t, err := template.ParseFiles(template_name + ".html")
+	t, err := template.ParseFiles("wiki/templates/" + template_name + ".html")
 
 	// If there is an error in the Page we're trying to pipe back to the client, then return HTTP Internal Server Error error.
 	if err != nil {

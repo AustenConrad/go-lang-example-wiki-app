@@ -1,0 +1,10 @@
+# App Engine Cron Service allows you to configure regularly scheduled tasks that operate 
+# at defined times or regular intervals.
+cron:
+- description: heartbeat for Cloudant database connection.
+  url: /cron/heartbeat/cloudant
+  schedule: every 5 minutes synchronized
+
+- description: heartbeat for Rackspace Cloud connection.
+  url: /cron/heartbeat/rackspace
+  schedule: every 5 minutes

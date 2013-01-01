@@ -1,0 +1,56 @@
+application: go-lang-example-wiki-app
+version: 1
+runtime: go
+api_version: go1
+
+handlers:
+
+# Require users to be logged in to edit pages.
+- url: /edit/.*
+  script: _go_app
+  login: required
+
+# Require Application admins to access the admin url.
+- url: /admin/.*
+  script: _go_app
+  login: admin
+
+# Secured route for the google cron crawler when it activates scheduled task urls. 
+- url: /cron/.*
+  script: _go_app
+  login: admin
+
+# All other routes. IMPORTANT: This should always be the last route listed.
+- url: /.*
+  script: _go_app
+  login: optional
+
+inbound_services:
+# This causes the App Engine infrastructure to issue GET requests to /_ah/warmup. 
+# You can implement handlers in this directory to perform application-specific tasks, 
+# such as pre-caching application data.
+- warmup
+
+# If you have administrator-only pages in your application that are used to administer the app, 
+# you can have those pages appear in the Administration Console. The Administration Console 
+# includes the name of the page in its sidebar, and displays the page in an HTML iframe. 
+admin_console:
+  pages:
+  - name: Wiki Admin
+    url: /admin
+  - name: Another Admin Page
+    url: /admin/test
+
+# When certain errors occur, App Engine serves a generic error page. You can configure your app 
+# to serve a custom static file instead of these generic error pages.
+error_handlers:
+  - file: default_error.html
+  # Google App Engine quota exceeded.
+  - error_code: over_quota
+    file: over_quota.html
+  # Served to any client blocked by your app's DoS Protection configuration.
+  - error_code: dos_api_denial
+    file: dos_api_denial.html
+  # Served if a deadline is reached before there is a response from your app.
+  - error_code: timeout
+    file: timeout.html
