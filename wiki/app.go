@@ -39,7 +39,7 @@ func main() {
 // Base URL is a 'Hello World' that uses your google account name.
 func homepage(res http.ResponseWriter, req *http.Request) {
 
-	fmt.Fprintf(res, "Welcome Mate! ")
+	fmt.Fprintf(res, "Welcome Mate! Go to /view/[topic] to read, edit, or add that topic to the wiki. For example: view/squirrel, view/ruby. view/test")
 
 }
 
