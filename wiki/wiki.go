@@ -2,10 +2,10 @@
 package examplewiki
 
 import (
-	/* Switched to a closure to load and validate the page's title instead. See 'makeHandler'
+	"appengine"
+	"appengine/datastore"
 	"errors"
-	*/
-	//"fmt"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -43,17 +43,43 @@ func (p *Page) save() error {
 	return ioutil.WriteFile(filename, p.Body, 0600)
 }
 
-// Loads the page from disk into memory. Uses the page's title to reference the page's file name.
-func loadPage(title string) (*Page, error) {
-	filename := "wiki/data/" + title + ".txt"
-	body, err := ioutil.ReadFile(filename)
+// Loads the page from the Google App Engine datastore into memory. Uses the page's title to reference the page.
+func loadPage(title string, req *http.Request) (*Page, error) {
 
-	// Check for any errors that occured while opening the specified file.
+	// Retrieve the page from the Google App Engine datastore.
+	datastoreContext := appengine.NewContext(req)
+
+	// Contruct a query for the requested page. Will return all revisions of the page with that title.
+	query := datastore.NewQuery("page").Filter("Title =", title)
+
+	// Initialize an empty page array to hold the results of the query.
+	var pagesFromDatastore []*Page
+
+	// Run the query.
+	_, err := query.GetAll(datastoreContext, &pagesFromDatastore)
+
+	// Handle query errors.
 	if err != nil {
 		return nil, err
 	}
+	// If no existing pages match the query then return an error.
+	if pagesFromDatastore == nil {
+		err := errors.New("Page does not exist.")
+		return nil, err
+	}
 
-	return &Page{Title: title, Body: body}, nil
+	// Output to the consule how many revisions of the page have been made.
+	fmt.Printf("\nNumber of revisions: %s", len(pagesFromDatastore))
+
+	// Iterate through the array of Pages returned by the search. Output to the consule 
+	// the values of the previous versions of the page.
+	for x := range pagesFromDatastore {
+		fmt.Printf("\nVersion %s = Title: \"%s\" - Body: \"%s\" \n", x, pagesFromDatastore[x].Title, pagesFromDatastore[x].Body)
+	}
+
+	// Return the latest version to the caller so that it can be rendered.
+	return &Page{Title: pagesFromDatastore[len(pagesFromDatastore)-1].Title, Body: pagesFromDatastore[len(pagesFromDatastore)-1].Body}, nil
+
 }
 
 ////// HTTP Logic //////
@@ -126,7 +152,7 @@ func viewHandler(res http.ResponseWriter, req *http.Request, title string) {
 	*/
 
 	// Load the page from disk.
-	p, err := loadPage(title)
+	p, err := loadPage(title, req)
 
 	// If the page does not exist then redirect the user to a blank page for adding a new page to the wiki.
 	if err != nil {
@@ -152,7 +178,7 @@ func editHandler(res http.ResponseWriter, req *http.Request, title string) {
 	*/
 
 	// Retrieve the requested page.
-	p, err := loadPage(title)
+	p, err := loadPage(title, req)
 
 	// If the page does not yet exist, then let the user create it.
 	if err != nil {
@@ -181,15 +207,30 @@ func saveHandler(res http.ResponseWriter, req *http.Request, title string) {
 
 	// Construct the updated page.
 	// NOTE: 'Body' is a byte slice because that's what the 'io' package expect.
-	p := &Page{Title: title, Body: []byte(body)}
+	p := &Page{
+		Title: title,
+		Body:  []byte(body)}
 
+	/* Switched from disk to datastore for storing the content.
 	// Save the page to disk.
 	err := p.save()
+	*/
+
+	// Save the page as the latest revision to the Google App Engine datastore.
+	datastoreContext := appengine.NewContext(req)
+	key, err := datastore.Put(datastoreContext, datastore.NewIncompleteKey(datastoreContext, "page", nil), p)
 
 	// If there was an error saving the page to disk, then return HTTP Internal Server Error error.
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Verify that it stored by retrieving it's value from the datastore and then inform the consule.
+	var p2 Page
+	err = datastore.Get(datastoreContext, key, &p2)
+	if err == nil {
+		fmt.Printf("Verified Storage of Page: "+p2.Title+" -- %s", p2.Body)
 	}
 
 	// Redirect to the updated page.
